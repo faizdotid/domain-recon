@@ -41,7 +41,13 @@ Advanced Domain Reconnaissance Tool with beautiful terminal UI powered by [Rich]
 uv sync
 
 # Or using pip
-pip install -r requirements.txt
+pip install .
+```
+
+After installing, the `domain-recon` command is available on your PATH:
+
+```bash
+domain-recon -u example.com
 ```
 
 ## Usage

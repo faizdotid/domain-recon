@@ -107,7 +107,9 @@ def _is_expired(not_after: str | None) -> bool:
     if not not_after:
         return False
     try:
-        dt = datetime.strptime(not_after, "%b %d %H:%M:%S %Y %Z")
-        return dt < datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+        dt = datetime.strptime(not_after, "%b %d %H:%M:%S %Y %Z").replace(
+            tzinfo=datetime.timezone.utc
+        )
+        return dt < datetime.now(datetime.timezone.utc)
     except ValueError:
         return False

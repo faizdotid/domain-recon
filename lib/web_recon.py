@@ -6,12 +6,9 @@ import re
 from typing import Any
 
 import requests
-from rich.console import Console
 
 from lib.config import TECH_FINGERPRINTS, USER_AGENTS, WAF_SIGNATURES
 from lib.utils import clean_url, favicon_hash, get_headers
-
-console = Console()
 
 
 class WebRecon:

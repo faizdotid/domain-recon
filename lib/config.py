@@ -923,6 +923,9 @@ TOP_PORTS_UDP = [
     11211,
 ]
 
+TOP_PORTS_TCP = list(dict.fromkeys(TOP_PORTS_TCP))
+TOP_PORTS_UDP = list(dict.fromkeys(TOP_PORTS_UDP))
+
 # =============================================================================
 # SERVICE NAMES for well-known ports
 # =============================================================================
@@ -1184,7 +1187,7 @@ SERVICE_NAMES: dict[int, str] = {
     1556: "VERITAS-pbx",
     1580: "tn-tl-r1",
     1583: "simbaexpress",
-    1594: " sixtrak",
+    1594: "sixtrak",
     1600: "issd",
     1641: "invision",
     1658: "sixnetudr",
@@ -1476,7 +1479,7 @@ SERVICE_NAMES: dict[int, str] = {
     5907: "dsd",
     5910: "cm",
     5911: "cpdlc",
-    5915: " unknown",
+    5915: "unknown",
     5922: "unset",
     5925: "unset",
     5963: "indy",
@@ -2414,7 +2417,7 @@ WORDLIST_PATHS = [
     "/vue.config.js",
     "/angular.json",
     "/ionic.config.json",
-    "/ capacitor.config.json",
+    "/capacitor.config.json",
     "/cordova",
     "/cordova/",
     "/phonegap",
@@ -3640,6 +3643,8 @@ WORDLIST_PATHS = [
     "/socialfi",
     "/socialfi/",
 ]
+
+WORDLIST_PATHS = list(dict.fromkeys(WORDLIST_PATHS))
 
 # =============================================================================
 # HTTP METHODS

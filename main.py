@@ -7,9 +7,9 @@ import argparse
 import csv
 import json
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from rich.console import Console
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
@@ -27,10 +27,16 @@ from lib.enumerator import DomainEnumerator
 from lib.portscan import scan_ports
 from lib.probe import PathProbe
 from lib.ssl_recon import ssl_info, test_ssl_versions
-from lib.utils import clean_url, get_ip, is_valid_domain, make_table, print_banner
+from lib.utils import (
+    clean_url,
+    console,
+    get_ip,
+    is_valid_domain,
+    make_table,
+    print_banner,
+    strip_markup,
+)
 from lib.web_recon import WebRecon
-
-console = Console()
 
 
 def run_dns(domain: str):
@@ -412,17 +418,23 @@ def run_web(domain: str, full: bool = False):
         for u in wb[:15]:
             console.print(f"  {u}")
 
+    use_https = recon.https_response is not None
+
     return {
         "domain": domain,
         "ip": get_ip(domain),
-        "title": recon.get_title(True) or recon.get_title(False),
-        "status_code": recon.get_status_code(True) or recon.get_status_code(False),
-        "server": recon.get_server(True) or recon.get_server(False),
+        "title": recon.get_title(use_https),
+        "status_code": recon.get_status_code(use_https),
+        "server": recon.get_server(use_https),
         "tech": techs,
         "waf": wafs,
-        "headers": sec,
-        "cors": cors,
-        "cookies": cookies,
+        "headers": {k: strip_markup(v) for k, v in sec.items()},
+        "cors": {
+            "enabled": cors["enabled"],
+            "misconfigured": cors["misconfigured"],
+            "details": [strip_markup(d) for d in cors["details"]],
+        },
+        "cookies": [{**c, "flags": strip_markup(c["flags"])} for c in cookies],
         "favicon": fav,
     }
 
@@ -440,6 +452,28 @@ def run_traceroute(domain: str):
     for h in hops:
         table.add_row(str(h["hop"]), h["host"], h["time_ms"])
     console.print(table)
+
+
+def _scan_enum_target(target: str) -> dict:
+    recon = WebRecon(target)
+    ok = recon.fetch(use_https=False)
+    if ok and recon.response:
+        tech_list = list(recon.detect_tech(False).keys())[:3]
+        return {
+            "domain": target,
+            "status": recon.get_status_code(False),
+            "title": recon.get_title(False),
+            "server": recon.get_server(False),
+            "tech": ", ".join(tech_list) if tech_list else "Unknown",
+        }
+    return {
+        "domain": target,
+        "status": "unreachable",
+        "title": "—",
+        "server": "—",
+        "tech": "—",
+        "error": recon.error,
+    }
 
 
 def run_enumeration(domain: str, mode: str, threads: int):
@@ -480,15 +514,20 @@ def run_enumeration(domain: str, mode: str, threads: int):
         ],
     )
 
-    for target in results:
-        recon = WebRecon(target)
-        ok = recon.fetch(use_https=False)
-        if ok and recon.response:
-            tech_list = list(recon.detect_tech(False).keys())[:3]
-            cms = ", ".join(tech_list) if tech_list else "Unknown"
-            status = recon.get_status_code(False)
-            title = recon.get_title(False)
-            server = recon.get_server(False)
+    with ThreadPoolExecutor(max_workers=max(1, min(threads, len(results)))) as executor:
+        scanned = list(executor.map(_scan_enum_target, results))
+
+    for item in scanned:
+        if item["status"] == "unreachable":
+            table.add_row(
+                f"http://{item['domain']}",
+                item["title"],
+                "[red]Unreachable[/red]",
+                item["tech"],
+                item["server"],
+            )
+        else:
+            status = item["status"]
             color = (
                 "green"
                 if status.startswith("2")
@@ -497,21 +536,11 @@ def run_enumeration(domain: str, mode: str, threads: int):
                 else "red"
             )
             table.add_row(
-                f"http://{target}", title, f"[{color}]{status}[/{color}]", cms, server
-            )
-            scanned.append(
-                {
-                    "domain": target,
-                    "status": status,
-                    "title": title,
-                    "server": server,
-                    "tech": tech_list,
-                }
-            )
-        else:
-            table.add_row(f"http://{target}", "—", "[red]Unreachable[/red]", "—", "—")
-            scanned.append(
-                {"domain": target, "status": "unreachable", "error": recon.error}
+                f"http://{item['domain']}",
+                item["title"],
+                f"[{color}]{status}[/{color}]",
+                item["tech"],
+                item["server"],
             )
 
     console.print(table)
@@ -649,7 +678,9 @@ def main():
                     run_single_target(domain, full=True, threads=args.threads)
                 )
 
-            if not any([args.dns, args.whois, args.ssl, args.trace, args.ports]):
+            if not any(
+                [args.dns, args.whois, args.ssl, args.trace, args.ports, args.full]
+            ):
                 all_results.append(
                     run_single_target(domain, full=False, threads=args.threads)
                 )

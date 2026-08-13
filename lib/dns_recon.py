@@ -10,9 +10,10 @@ from typing import Any
 import dns.resolver
 import dns.zone
 import whois
-from rich.console import Console
 
-console = Console()
+from lib.utils import console
+
+DNS_RESOLVER = "8.8.8.8"
 
 # Services commonly vulnerable to subdomain takeover
 TAKEOVER_SERVICES = {
@@ -108,8 +109,9 @@ def check_zone_transfer(domain: str) -> dict[str, Any]:
                 for name, node in zone.nodes.items():
                     for rdataset in node.rdatasets:
                         result["records"].append(f"{name} {rdataset}")
-            except Exception:
-                pass
+            except Exception as exc:
+                if result["error"] is None:
+                    result["error"] = f"{ns_name}: {exc}"
     except Exception as exc:
         result["error"] = str(exc)
     return result
@@ -170,7 +172,7 @@ def check_dnssec(domain: str) -> dict[str, Any]:
     result: dict[str, Any] = {"enabled": False, "validated": False, "details": []}
     try:
         request = dns.message.make_query(domain, dns.rdatatype.A, want_dnssec=True)
-        response = dns.query.udp(request, "8.8.8.8", timeout=5)
+        response = dns.query.udp(request, DNS_RESOLVER, timeout=5)
         if response.flags & dns.flags.DO:
             result["enabled"] = True
         # Check for RRSIG

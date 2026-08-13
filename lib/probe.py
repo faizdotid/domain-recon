@@ -7,7 +7,7 @@ from typing import Any
 
 import requests
 
-from lib.config import HTTP_METHODS, WORDLIST_PATHS
+from lib.config import WORDLIST_PATHS
 from lib.utils import get_headers
 
 
@@ -80,6 +80,7 @@ class PathProbe:
     def probe_all(self) -> dict[str, Any]:
         """Probe all paths with smart filtering."""
         from concurrent.futures import ThreadPoolExecutor, as_completed
+
         from rich.progress import Progress
 
         # Establish 404 baseline first
@@ -122,24 +123,3 @@ class PathProbe:
                         found["interesting"].append(res)
 
         return found
-
-    def test_methods(self, target_url: str | None = None) -> dict[str, Any]:
-        """Test allowed HTTP methods."""
-        url = target_url or self.base_url
-        result: dict[str, Any] = {"allowed": [], "denied": [], "errors": []}
-        for method in HTTP_METHODS:
-            try:
-                resp = requests.request(
-                    method,
-                    url,
-                    headers=get_headers(),
-                    timeout=10,
-                    allow_redirects=False,
-                )
-                if resp.status_code < 400:
-                    result["allowed"].append((method, resp.status_code))
-                else:
-                    result["denied"].append((method, resp.status_code))
-            except Exception:
-                result["errors"].append(method)
-        return result

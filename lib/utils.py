@@ -67,8 +67,8 @@ def clean_url(url: str) -> str:
     if not url.startswith(("http://", "https://")):
         url = "http://" + url
     parsed = urllib.parse.urlparse(url)
-    netloc = parsed.netloc or parsed.path
-    return netloc.replace("www.", "", 1) if netloc.startswith("www.") else netloc
+    host = parsed.hostname or parsed.netloc or parsed.path
+    return host[4:] if host.startswith("www.") else host
 
 
 def get_ip(domain: str) -> str:
@@ -110,10 +110,18 @@ def get_headers(
     return headers
 
 
+_RICH_TAGS = re.compile(r"\[/?[^\[\]]*\]")
+
+
+def strip_markup(text: str) -> str:
+    """Remove Rich markup tags from a string."""
+    return _RICH_TAGS.sub("", text)
+
+
 def make_table(title: str, columns: list[tuple[str, str]]) -> Any:
     """Helper to create a styled Rich Table."""
-    from rich.table import Table
     from rich import box
+    from rich.table import Table
 
     table = Table(
         title=title,
